@@ -11,31 +11,30 @@ import model.wcnn as wcnn
 import math
 from utils.astools import CSVStats, train, validate, save_checkpoint
 from utils.load_data import load_data
-
 parser = argparse.ArgumentParser(description='Training cammands')
 
 parser.add_argument('--data_name', type=str, default='barkvn-50', help='dataset name')
-parser.add_argument('--gcn', type=bool, default=False, help='gcn')
-parser.add_argument('--split_data', type=int, default=0.2, help='split data')
+parser.add_argument('--gcn', type=bool, default=True, help='gcn')
+parser.add_argument('--split_data', type=int, default=0.25, help='split data')
 parser.add_argument('--batch_size', type=int, default=16, help='batch size')
 parser.add_argument('--lr', type=float, default=0.03, help='learning rate')
 parser.add_argument('--epochs', type=int, default=300, help='learning epochs')
 parser.add_argument('--name', default='fldqwn', type=str)
 parser.add_argument('--resume', default=False, type=bool)
-parser.add_argument("--lrdecay", nargs='+', type=int, default=[75, 150])
-parser.add_argument('--drop', default=10, type=int, help='drop learning rate')
+parser.add_argument("--lrdecay", nargs='+', type=int, default=[30,60,90,120])
+parser.add_argument('--drop', default=3, type=int, help='drop learning rate')
 
 
 subparsers = parser.add_subparsers(dest="model")
 parser_despawn = subparsers.add_parser('fldqwn')
 parser_despawn.add_argument('--first_out_channel', default=64, type=int, help='first out channel')
 parser_despawn.add_argument('--num_level', default=5, type=int, help='number of level')
-parser_despawn.add_argument('--kernel_size', default=2, type=int, help='wavelet kernel_size')
+parser_despawn.add_argument('--kernel_size', default=8, type=int, help='wavelet kernel_size')
 parser_despawn.add_argument('--regu_details', default=0.1, type=float, help='regu_details')
 parser_despawn.add_argument('--regu_approx', default=0.1, type=float, help='regu_approx')
 parser_despawn.add_argument('--bottleneck', default=True, type=bool, help='bottleneck')
 parser_despawn.add_argument('--moreconv', default=True, type=bool, help='moreconv')
-parser_despawn.add_argument('--wavelet', default='haar', type=str, help='wavelet')
+parser_despawn.add_argument('--wavelet', default='db4', type=str, help='wavelet')
 parser_despawn.add_argument('--mode', choices=['Stable', 'CQF_Low_1', 'CQF_All_1_Filter', 'CQF_Low_All', 'CQF_All_All',
                                                'Layer_Low_1', 'Layer_All_1_Filter', 'Layer_Low_All', 'Free'], default='Free')
 
@@ -205,15 +204,20 @@ print("Number of *trainable* model parameters: {:,}".format(
     sum(p.numel() for p in model.parameters() if p.requires_grad)))
 
 best_prec1 = 0
+# scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', 
+#                                            factor=0.1, patience=15, 
+#                                            verbose=True, threshold=0.0001, 
+#                                            threshold_mode='rel', 
+#                                            cooldown=0, min_lr=0, eps=1e-08)
 for epoch in range(args.epochs):
     t0 = time.time()  # 计时
     adjust_learning_rate(optimizer, epoch, args.drop)
-    prec1_train, preck_train, loss_train = train(
-        train_loader, model, lossfunc, optimizer, epoch, print_freq=20, tpk=3, model_name=args.model)
+    prec1_train, loss_train = train(
+        train_loader, model, lossfunc, optimizer, model_name=args.model)
     torch.cuda.empty_cache()
-    prec1_val, preck_val, loss_val = validate(
-            val_loader, model, lossfunc, epoch, print_freq=20, tpk=3, model_name=args.model)
-    csv_logger.add(prec1_train, prec1_val, preck_train, preck_val, loss_train, loss_val)
+    prec1_val, loss_val = validate(
+            val_loader, model, lossfunc, model_name=args.model)
+    csv_logger.add(prec1_train, prec1_val, loss_train, loss_val)
 
     is_best = prec1_val > best_prec1
     best_prec1 = max(prec1_val, best_prec1)
@@ -227,9 +231,8 @@ for epoch in range(args.epochs):
     csv_logger.write()
 
     # Final print
-    print(' * Train[{:.3f} %, {:.3f} %, {:.3f} loss] Val [{:.3f} %, {:.3f}%, {:.3f} loss] Best: {:.3f} %'.format(
-        prec1_train, preck_train, loss_train, prec1_val, preck_val, loss_val, best_prec1))
-    print('Time for', epoch, "/", args.epochs, time.time() - t0)
+    print('Epoch {} : Train[{:.3f} %, {:.3f} loss] Val [{:.3f} %, {:.3f} loss] Best: {:.3f} %'.format(
+        epoch, prec1_train, loss_train, prec1_val, loss_val, best_prec1))
 
 print('Best accuracy: ', best_prec1)
 

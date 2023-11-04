@@ -6,33 +6,74 @@ import torchvision.datasets as datasets
 
 
 def load_data(data_name=None, gcn=False, split_data=0.2, batch_size=16):    
-    if data_name == 'dtd':
+    if data_name == 'leaves':
         if gcn:
             normalize = GCN()
         else:
             normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                         std=[0.229, 0.224, 0.225])
         transform_train = transforms.Compose(
-                            [transforms.Resize(256),
-                             transforms.RandomCrop(224),
+                            [# transforms.Resize(128),
+                             transforms.RandomCrop(128),
                              transforms.RandomHorizontalFlip(),
                              transforms.RandomVerticalFlip(),
                              transforms.ToTensor(),
                              normalize
                              ])
         transform_test = transforms.Compose(
-                            [transforms.Resize(256),
-                            transforms.CenterCrop(224),
+                            [# transforms.Resize(256),
+                            transforms.CenterCrop(128),
                             transforms.ToTensor(),
                             normalize
                             ])
         
-        training_data = datasets.dtd.DTD(root='./data/', split="train", partition=10,
+        train_set = datasets.ImageFolder(
+            root="./data/LeavesTex1200", transform=transform_train)
+        val_set = datasets.ImageFolder(
+            root="./data/LeavesTex1200", transform=transform_test)
+        num_classes = 20
+
+        num_train = len(train_set)
+        indices = list(range(num_train))
+        np.random.shuffle(indices)
+        split = int(np.floor(split_data * num_train))
+        train_idx, valid_idx = indices[split:], indices[:split]
+        train_sampler = torch.utils.data.sampler.SubsetRandomSampler(train_idx)
+        train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size,
+                                                    sampler=train_sampler, num_workers=0)
+        val_sampler = torch.utils.data.sampler.SubsetRandomSampler(valid_idx)
+        val_loader = torch.utils.data.DataLoader(val_set, batch_size=batch_size,
+                                                    sampler=val_sampler, num_workers=0)
+        
+        
+    if data_name == 'dtd':
+        if gcn:
+            normalize = GCN()
+        else:
+            normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                std=[0.229, 0.224, 0.225])
+
+        transform_train = transforms.Compose([
+                transforms.Resize(256),
+                transforms.RandomResizedCrop(224),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                normalize
+        ])
+        transform_test = transforms.Compose([
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                normalize
+        ])
+        
+        training_data = datasets.dtd.DTD(root='./data/dtd/', split="train",
                                          download=True, transform=transform_train)
-        val_data = datasets.dtd.DTD(root='./data/', split="val", partition=10,
+        validation_data = datasets.dtd.DTD(root='./data/dtd/', split="val",
                                            download=True, transform=transform_test)
+        
         train_loader = torch.utils.data.DataLoader(training_data, batch_size=batch_size, shuffle=True)
-        val_loader = torch.utils.data.DataLoader(val_data, batch_size=batch_size, shuffle=True)
+        val_loader = torch.utils.data.DataLoader(validation_data, batch_size=batch_size, shuffle=True)
         num_classes = 47
 
         
@@ -41,7 +82,8 @@ def load_data(data_name=None, gcn=False, split_data=0.2, batch_size=16):
             normalize = GCN()
         else:
             normalize = transforms.Normalize(mean=[x/255.0 for x in [125.3, 123.0, 113.9]],
-                                        std=[x/255.0 for x in [63.0, 62.1, 66.7]])
+                                             std=[x/255.0 for x in [63.0, 62.1, 66.7]])
+
         transform_train = transforms.Compose(
                             [transforms.Resize((256, 256)),
                              transforms.RandomCrop(224),
@@ -57,38 +99,51 @@ def load_data(data_name=None, gcn=False, split_data=0.2, batch_size=16):
                              normalize
                              ])
 
-        kth_train_dataset = datasets.ImageFolder(root='./data/kth/train', transform=transform_train)
-        kth_test_dataset = datasets.ImageFolder(root='./data/kth/test', transform=transform_test)
-        train_loader = torch.utils.data.DataLoader(kth_train_dataset, shuffle=True, batch_size=batch_size)
-        val_loader = torch.utils.data.DataLoader(kth_test_dataset, shuffle=True, batch_size=batch_size)
+        train_set = datasets.ImageFolder(root='./data/kth/',
+                                                 transform=transform_train)
+        val_set = datasets.ImageFolder(root='./data/kth/',
+                                                transform=transform_test)
+        num_train = len(train_set)
+        indices = list(range(num_train))
+        np.random.shuffle(indices)
+        split = int(np.floor(split_data * num_train))
+        train_idx, valid_idx = indices[split:], indices[:split]
+        train_sampler = torch.utils.data.sampler.SubsetRandomSampler(train_idx)
+        train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size,
+                                                    sampler=train_sampler, num_workers=0)
+        val_sampler = torch.utils.data.sampler.SubsetRandomSampler(valid_idx)
+        val_loader = torch.utils.data.DataLoader(val_set, batch_size=batch_size,
+                                                    sampler=val_sampler, num_workers=0)
         num_classes = 11
-
-    elif data_name == 'cifar-10':
+        
+    elif data_name == 'flower102':
         if gcn:
             normalize = GCN()
         else:
-            normalize = transforms.Normalize(mean=[0.4914, 0.4821, 0.4465],
-                                            std=[0.2470, 0.2435, 0.2616])
-
+            normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                        std=[0.229, 0.224, 0.225])
         transform_train = transforms.Compose(
-                            [transforms.RandomCrop(32, padding=4),
-                            transforms.RandomHorizontalFlip(),
+                            [transforms.Resize(256),
+                                transforms.RandomCrop(224),
+                                transforms.RandomHorizontalFlip(),
+                                transforms.RandomVerticalFlip(),
+                                transforms.ToTensor(),
+                                normalize
+                                ])
+        transform_test = transforms.Compose(
+                            [transforms.Resize(256),
+                            transforms.CenterCrop(224),
                             transforms.ToTensor(),
                             normalize
                             ])
-        transform_test = transforms.Compose(
-                            [transforms.ToTensor(),
-                            normalize
-                            ])
+        train_set = datasets.Flowers102('./data/flower102/', split='train', transform=transform_train, download=True)
+        val_set = datasets.Flowers102('./data/flower102/', split='val', transform=transform_test, download=True)
         
-        train_loader = torch.utils.data.DataLoader(
-                datasets.CIFAR10("./data/cifar10", train=True, download=True, transform=transform_train),
-                batch_size=batch_size, shuffle=True)
-        val_loader = torch.utils.data.DataLoader(
-                datasets.CIFAR10("./data/cifar10", train=False, download=True, transform=transform_test),
-                batch_size=batch_size, shuffle=True) 
-        num_classes = 10 
+        train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, num_workers=0)
+        val_loader = torch.utils.data.DataLoader(val_set, batch_size=batch_size, num_workers=0)
 
+        num_classes = 102
+        
     else:
         if gcn:
             normalize = GCN()
@@ -133,6 +188,12 @@ def load_data(data_name=None, gcn=False, split_data=0.2, batch_size=16):
             val_set = datasets.ImageFolder(
                 root="./data/barktexture54", transform=transform_test)
             num_classes = 54
+        elif data_name == 'FMD':
+            train_set = datasets.ImageFolder(
+                root="./data/FMD", transform=transform_train)
+            val_set = datasets.ImageFolder(
+                root="./data/FMD", transform=transform_test)
+            num_classes = 10
         else:
             raise "Unknown dataset"
         

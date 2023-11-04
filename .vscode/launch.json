@@ -13,8 +13,8 @@
             "justMyCode": true,
             "args": [
                 "--name", "fldqwn64",
-                "--data_name", "cifar-10",
-                "--batch_size", "32", 
+                "--data_name", "flower102",
+                "--batch_size", "4", 
                 "fldqwn",
 
 

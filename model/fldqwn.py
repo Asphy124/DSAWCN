@@ -65,10 +65,12 @@ class WN_SubBlock(nn.Module):  # 一个Block，包含一个低通滤波器和一
         w1 = nn.Conv2d(self.in_channels, self.in_channels, self.kernel_size, stride=s, bias=False, groups=in_channels)  # channels需要修改
         w1.weight = nn.Parameter(data=low_pass_filter.clone(), requires_grad=trainable[0])  # 初始化完成
         self.kernel_Low = nn.Sequential(w1, nn.Tanh())
+        # self.kernel_Low = nn.Sequential(w1, )
 
         w2 = nn.Conv2d(self.in_channels, self.in_channels, self.kernel_size, stride=s, bias=False, groups=in_channels)
         w2.weight = nn.Parameter(data=high_pass_filter.clone(), requires_grad=trainable[1])
         self.kernel_High = nn.Sequential(w2, nn.Tanh())
+        # self.kernel_High = nn.Sequential(w2, )
 
 
     def forward(self, input_data):
@@ -206,8 +208,8 @@ class BottleneckBlock(nn.Module):
         # This disable the conv if compression rate is equal to 1
         self.disable_conv = in_planes == out_planes
         if not self.disable_conv:
-            self.conv1 = nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=1,
-                                   padding=0, bias=False)
+            self.conv1 = nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=1,
+                                   padding=1, bias=False)
 
     def forward(self, x):
         if self.disable_conv:
@@ -245,9 +247,9 @@ class LevelWNBlocks(nn.Module):
         r = None
         if(self.regu_approx + self.regu_details != 0.0):
             if self.regu_details:
-                rd = self.regu_details * d.abs().mean()
-                rd += self.regu_details * lh.abs().mean()
-                rd += self.regu_details * hh.abs().mean()
+                rd = self.regu_details * self.loss_details(d, torch.zeros(d.size()).cuda())
+                rd += self.regu_details * self.loss_details(lh, torch.zeros(lh.size()).cuda())
+                rd += self.regu_details * self.loss_details(hh, torch.zeros(hh.size()).cuda())
             if self.regu_approx:
                 rc = self.regu_approx * torch.dist(c.mean(), ll.mean(), p=2)
                 rc += self.regu_approx * torch.dist(ll.mean(), c.mean(), p=2)
@@ -297,10 +299,10 @@ class FLDQWN(nn.Module):
         self.conv1 = nn.Sequential(
             nn.Conv2d(first_in_channel, first_out_channel, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(first_out_channel),
-            nn.ReLU(True),
+            nn.Tanh(),
             nn.Conv2d(first_out_channel, first_out_channel, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(first_out_channel),
-            nn.ReLU(True),
+            nn.Tanh(),
         )
         
         
@@ -326,7 +328,14 @@ class FLDQWN(nn.Module):
         else:
             for i in range(num_level):
                 out_planes += in_channel*3
-        self.fc = nn.Linear(out_planes, num_classes)
+        # self.fc = nn.Linear(out_planes, num_classes)
+        self.fc = nn.Sequential(
+            nn.Linear(out_planes, 128),       
+            nn.Tanh(),
+            nn.Dropout(0.1),
+            nn.Linear(128, num_classes)#,
+            # nn.Softmax(dim=1)
+        )
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
     
     def forward(self, x):
@@ -356,7 +365,58 @@ class FLDQWN(nn.Module):
         x = x.view(-1, x.size()[1])
         return self.fc(x), rs
             
+# def pad(signal, padsize, horizontal=True):
+#     signal_padded = signal.clone()
 
+#     if horizontal:
+#         dim = signal.dim()-1
+#         i = padsize // signal.shape[-1]  # recycle
+#         ipad = signal.shape[-1]  # recycle padsize
+#         jpad = padsize % signal.shape[-1]  # final_padsize
+
+#         # ...
+#         for _ in range(i):
+#             signal_padded = torch.cat([torch.flip(signal_padded[:,:,:, :ipad], [dim]),
+#                                        signal_padded, 
+#                                        torch.flip(signal_padded[:,:,:,-ipad:], [dim])],  dim)
+#         if jpad==0 and signal.shape[-1] % 2 == 0:
+#             return signal_padded
+#         if signal.shape[-1] % 2 == 1:
+
+#             # ...
+#             signal_padded = torch.cat([torch.flip(signal_padded[:,:,:, :jpad], [dim]),
+#                                     signal_padded,
+#                                     torch.flip(signal_padded[:,:,:,-jpad-1:], [dim])],  dim)
+#         else:
+#             # ...
+#             signal_padded = torch.cat([torch.flip(signal_padded[:,:,:, :jpad], [dim]),
+#                                     signal_padded,
+#                                     torch.flip(signal_padded[:,:,:,-jpad:], [dim])],  dim)
+#         return signal_padded
+#     else:
+#         dim = signal.dim()-2
+#         i = padsize // signal.shape[-2]  # recycle
+#         ipad = signal.shape[-2]
+#         jpad = padsize % signal.shape[-2]
+
+#         for _ in range(i):
+#             signal_padded = torch.cat([torch.flip(signal_padded[:,:,:ipad, :], [dim]),
+#                                        signal_padded, 
+#                                        torch.flip(signal_padded[:,:,-ipad:, :], [dim])],  dim)
+#         if jpad==0 and signal.shape[-2] % 2 == 0:
+#             return signal_padded
+#         if signal.shape[-2] % 2 == 1:
+
+#             signal_padded = torch.cat([torch.flip(signal_padded[:,:,:jpad, :], [dim]),
+#                                     signal_padded,
+#                                     torch.flip(signal_padded[:,:,-jpad-1:, :], [dim])],  dim)
+#         else:
+
+#             signal_padded = torch.cat([torch.flip(signal_padded[:,:,:jpad, :], [dim]),
+#                                     signal_padded,
+#                                     torch.flip(signal_padded[:,:,-jpad:, :], [dim])],  dim)
+#         return signal_padded
+           
 
 def pad(signal, padsize, horizontal=True):
     signal_padded = signal.clone()
