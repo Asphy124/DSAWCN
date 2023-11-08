@@ -13,15 +13,16 @@ from utils.astools import CSVStats, train, validate, save_checkpoint
 from utils.load_data import load_data
 parser = argparse.ArgumentParser(description='Training cammands')
 
-parser.add_argument('--data_name', type=str, default='barkvn-50', help='dataset name')
-parser.add_argument('--gcn', type=bool, default=True, help='gcn')
-parser.add_argument('--split_data', type=int, default=0.25, help='split data')
+parser.add_argument('--data_name', type=str, default='bark-20', help='dataset name')
+parser.add_argument('--gcn', type=bool, default=False, help='gcn')
+parser.add_argument('--split_data', type=float, default=0.20, help='split data')
 parser.add_argument('--batch_size', type=int, default=16, help='batch size')
 parser.add_argument('--lr', type=float, default=0.03, help='learning rate')
 parser.add_argument('--epochs', type=int, default=300, help='learning epochs')
 parser.add_argument('--name', default='fldqwn', type=str)
 parser.add_argument('--resume', default=False, type=bool)
-parser.add_argument("--lrdecay", nargs='+', type=int, default=[30,60,90,120])
+parser.add_argument("--lrdecay", nargs='+', type=int, default=[30,60,90,120])  #除39外使用此衰减值
+# parser.add_argument("--lrdecay", nargs='+', type=int, default=[60, 120, 160, 200])  #除39外使用此衰减值
 parser.add_argument('--drop', default=3, type=int, help='drop learning rate')
 
 

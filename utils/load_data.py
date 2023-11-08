@@ -6,46 +6,6 @@ import torchvision.datasets as datasets
 
 
 def load_data(data_name=None, gcn=False, split_data=0.2, batch_size=16):    
-    if data_name == 'leaves':
-        if gcn:
-            normalize = GCN()
-        else:
-            normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                        std=[0.229, 0.224, 0.225])
-        transform_train = transforms.Compose(
-                            [# transforms.Resize(128),
-                             transforms.RandomCrop(128),
-                             transforms.RandomHorizontalFlip(),
-                             transforms.RandomVerticalFlip(),
-                             transforms.ToTensor(),
-                             normalize
-                             ])
-        transform_test = transforms.Compose(
-                            [# transforms.Resize(256),
-                            transforms.CenterCrop(128),
-                            transforms.ToTensor(),
-                            normalize
-                            ])
-        
-        train_set = datasets.ImageFolder(
-            root="./data/LeavesTex1200", transform=transform_train)
-        val_set = datasets.ImageFolder(
-            root="./data/LeavesTex1200", transform=transform_test)
-        num_classes = 20
-
-        num_train = len(train_set)
-        indices = list(range(num_train))
-        np.random.shuffle(indices)
-        split = int(np.floor(split_data * num_train))
-        train_idx, valid_idx = indices[split:], indices[:split]
-        train_sampler = torch.utils.data.sampler.SubsetRandomSampler(train_idx)
-        train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size,
-                                                    sampler=train_sampler, num_workers=0)
-        val_sampler = torch.utils.data.sampler.SubsetRandomSampler(valid_idx)
-        val_loader = torch.utils.data.DataLoader(val_set, batch_size=batch_size,
-                                                    sampler=val_sampler, num_workers=0)
-        
-        
     if data_name == 'dtd':
         if gcn:
             normalize = GCN()
@@ -75,74 +35,6 @@ def load_data(data_name=None, gcn=False, split_data=0.2, batch_size=16):
         train_loader = torch.utils.data.DataLoader(training_data, batch_size=batch_size, shuffle=True)
         val_loader = torch.utils.data.DataLoader(validation_data, batch_size=batch_size, shuffle=True)
         num_classes = 47
-
-        
-    elif data_name == 'kth':
-        if gcn:
-            normalize = GCN()
-        else:
-            normalize = transforms.Normalize(mean=[x/255.0 for x in [125.3, 123.0, 113.9]],
-                                             std=[x/255.0 for x in [63.0, 62.1, 66.7]])
-
-        transform_train = transforms.Compose(
-                            [transforms.Resize((256, 256)),
-                             transforms.RandomCrop(224),
-                             transforms.RandomHorizontalFlip(),
-                             transforms.RandomVerticalFlip(),
-                             transforms.ToTensor(),
-                             normalize
-                             ])
-        transform_test = transforms.Compose(
-                            [transforms.Resize((256, 256)),
-                             transforms.CenterCrop((224, 224)),
-                             transforms.ToTensor(),
-                             normalize
-                             ])
-
-        train_set = datasets.ImageFolder(root='./data/kth/',
-                                                 transform=transform_train)
-        val_set = datasets.ImageFolder(root='./data/kth/',
-                                                transform=transform_test)
-        num_train = len(train_set)
-        indices = list(range(num_train))
-        np.random.shuffle(indices)
-        split = int(np.floor(split_data * num_train))
-        train_idx, valid_idx = indices[split:], indices[:split]
-        train_sampler = torch.utils.data.sampler.SubsetRandomSampler(train_idx)
-        train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size,
-                                                    sampler=train_sampler, num_workers=0)
-        val_sampler = torch.utils.data.sampler.SubsetRandomSampler(valid_idx)
-        val_loader = torch.utils.data.DataLoader(val_set, batch_size=batch_size,
-                                                    sampler=val_sampler, num_workers=0)
-        num_classes = 11
-        
-    elif data_name == 'flower102':
-        if gcn:
-            normalize = GCN()
-        else:
-            normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                        std=[0.229, 0.224, 0.225])
-        transform_train = transforms.Compose(
-                            [transforms.Resize(256),
-                                transforms.RandomCrop(224),
-                                transforms.RandomHorizontalFlip(),
-                                transforms.RandomVerticalFlip(),
-                                transforms.ToTensor(),
-                                normalize
-                                ])
-        transform_test = transforms.Compose(
-                            [transforms.Resize(256),
-                            transforms.CenterCrop(224),
-                            transforms.ToTensor(),
-                            normalize
-                            ])
-        train_set = datasets.Flowers102('./data/flower102/', split='train', transform=transform_train, download=True)
-        val_set = datasets.Flowers102('./data/flower102/', split='val', transform=transform_test, download=True)
-        
-        train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, num_workers=0)
-        val_loader = torch.utils.data.DataLoader(val_set, batch_size=batch_size, num_workers=0)
-
-        num_classes = 102
         
     else:
         if gcn:
@@ -182,18 +74,30 @@ def load_data(data_name=None, gcn=False, split_data=0.2, batch_size=16):
             val_set = datasets.ImageFolder(
                 root="./data/barknet20", transform=transform_test)
             num_classes = 20
-        elif data_name == 'bark-54':
+        elif data_name == 'bark-39':
             train_set = datasets.ImageFolder(
-                root="./data/barktexture54", transform=transform_train)
+                root="./data/barktexture39", transform=transform_train)
             val_set = datasets.ImageFolder(
-                root="./data/barktexture54", transform=transform_test)
-            num_classes = 54
-        elif data_name == 'FMD':
+                root="./data/barktexture39", transform=transform_test)
+            num_classes = 39
+        elif data_name == 'leaves':
+            transform_train = transforms.Compose(
+                                [transforms.RandomCrop(128),
+                                transforms.RandomHorizontalFlip(),
+                                transforms.RandomVerticalFlip(),
+                                transforms.ToTensor(),
+                                normalize
+                                ])
+            transform_test = transforms.Compose(
+                                [transforms.CenterCrop(128),
+                                transforms.ToTensor(),
+                                normalize
+                                ])
             train_set = datasets.ImageFolder(
-                root="./data/FMD", transform=transform_train)
+                root="./data/LeavesTex1200", transform=transform_train)
             val_set = datasets.ImageFolder(
-                root="./data/FMD", transform=transform_test)
-            num_classes = 10
+                root="./data/LeavesTex1200", transform=transform_test)
+            num_classes = 20
         else:
             raise "Unknown dataset"
         
@@ -212,9 +116,6 @@ def load_data(data_name=None, gcn=False, split_data=0.2, batch_size=16):
     
 
 class GCN(object):
-    """
-    全局对比度归一化
-    """
     def __init__(self,
                  channel_wise=True,
                  scale=1.,
@@ -243,25 +144,4 @@ class GCN(object):
 
     def __repr__(self):
         return self.__class__.__name__
-    
-
-class Lighting(object):
-    """Lighting noise(AlexNet - style PCA - based noise)"""
-
-    def __init__(self, alphastd, eigval, eigvec):
-        self.alphastd = alphastd
-        self.eigval = eigval
-        self.eigvec = eigvec
-
-    def __call__(self, img):
-        if self.alphastd == 0:
-            return img
-
-        alpha = img.new().resize_(3).normal_(0, self.alphastd)
-        rgb = self.eigvec.type_as(img).clone()\
-            .mul(alpha.view(1, 3).expand(3, 3))\
-            .mul(self.eigval.view(1, 3).expand(3, 3))\
-            .sum(1).squeeze()
-
-        return img.add(rgb.view(3, 1, 1).expand_as(img))
 
