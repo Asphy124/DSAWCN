@@ -82,7 +82,7 @@ def adjust_learning_rate(optimizer, epoch, inv_drop):
     factor = math.pow(
         drop, sum([1.0 if epoch >= e else 0.0 for e in args.lrdecay]))
     lr = lr * factor
-    print("Learning rate: ", lr)
+    # print("Learning rate: ", lr)
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 

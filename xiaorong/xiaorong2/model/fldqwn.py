@@ -29,7 +29,7 @@ class downsample_conv_block(nn.Module):
             blks_tmp.append(blks1)
             for _ in range(level - j - 1):
                 blks2 = nn.Sequential(
-                    nn.Conv2d(in_plane, in_plane, kernel_size=3, stride=2, padding=1, bias=False, groups=in_plane),
+                    nn.Conv2d(in_plane, in_plane, kernel_size=3, stride=2, padding=1, bias=False),
                     nn.BatchNorm2d(in_plane),
                     nn.ReLU(inplace=True)
                 )
@@ -60,18 +60,18 @@ class WN_SubBlock(nn.Module):  # 一个Block，包含一个低通滤波器和一
             s = (2, 1)
 
         low_pass_filter = torch.cat([filter_Init] * in_channels, dim=0)
+        low_pass_filter = torch.cat([low_pass_filter] * in_channels, dim=1)  # 低通滤波器
         high_pass_filter = get_cmf(low_pass_filter, kernel_size)  # 高通滤波器
 
-        w1 = nn.Conv2d(self.in_channels, self.in_channels, self.kernel_size, stride=s, bias=False, groups=in_channels)  # channels需要修改
+        w1 = nn.Conv2d(self.in_channels, self.in_channels, self.kernel_size, stride=s, bias=False)  # channels需要修改
         w1.weight = nn.Parameter(data=low_pass_filter.clone(), requires_grad=trainable[0])  # 初始化完成
         self.kernel_Low = nn.Sequential(w1, nn.Tanh())
         # self.kernel_Low = nn.Sequential(w1, )
 
-        w2 = nn.Conv2d(self.in_channels, self.in_channels, self.kernel_size, stride=s, bias=False, groups=in_channels)
+        w2 = nn.Conv2d(self.in_channels, self.in_channels, self.kernel_size, stride=s, bias=False)
         w2.weight = nn.Parameter(data=high_pass_filter.clone(), requires_grad=trainable[1])
         self.kernel_High = nn.Sequential(w2, nn.Tanh())
         # self.kernel_High = nn.Sequential(w2, )
-
 
     def forward(self, input_data):
         input_data = pad(input_data, self.pad_size, horizontal=self.horizontal)
@@ -80,7 +80,6 @@ class WN_SubBlock(nn.Module):  # 一个Block，包含一个低通滤波器和一
             self.kernel_High[0].weight = nn.Parameter(data=get_cmf(self.kernel_Low[0].weight, self.kernel_size).clone(), requires_grad=False)
         high_coeff = self.kernel_High(input_data)
         return low_coeff, high_coeff
-
 
 
 class WNBlock(nn.Module):  # 一个Block，包含三个WN_SubBlock
@@ -93,7 +92,7 @@ class WNBlock(nn.Module):  # 一个Block，包含三个WN_SubBlock
         # 转为float32
         filter_Init = torch.from_numpy(filter_Init).float().to("cuda")
 
-        if (mode == "Free") or (mode == "CQF_All_All"):  # 块内全训练
+        if (mode == "Free"):  # 块内全训练
             self.wn1 = WN_SubBlock(horizontal=True, 
                     filter_Init=filter_Init, 
                     kernel_size=kernel_size, 
@@ -110,7 +109,7 @@ class WNBlock(nn.Module):  # 一个Block，包含三个WN_SubBlock
                     trainable=[True,True], 
                     in_channels=in_channels)
 
-        if mode == "Stable":  # 块内全不训练
+        elif mode == "Stable":  # 块内全不训练
             self.wn1 = WN_SubBlock(horizontal=True, 
                                 filter_Init=filter_Init, 
                                 kernel_size=kernel_size, 
@@ -127,75 +126,13 @@ class WNBlock(nn.Module):  # 一个Block，包含三个WN_SubBlock
                                 kernel_size=kernel_size,
                                 trainable=[False,False],
                                 in_channels=in_channels)
-        
-        elif (mode == "CQF_Low_1") or (mode == "Layer_Low_1"):  # 块内只训练第一个低频滤波器,CQF辐射到全局,Layer每层均可训练
-            self.wn1 = WN_SubBlock(horizontal=True, 
-                                filter_Init=filter_Init, 
-                                kernel_size=kernel_size, 
-                                trainable=[True,False], 
-                                in_channels=in_channels)
-            self.wn2 = WN_SubBlock(horizontal=False,
-                                filter_Init=filter_Init,
-                                kernel_size=kernel_size,
-                                trainable=[False,False],
-                                in_channels=in_channels)
-            
-            self.wn3 = WN_SubBlock(horizontal=False,
-                                filter_Init=filter_Init,
-                                kernel_size=kernel_size,
-                                trainable=[False,False],
-                                in_channels=in_channels)
-        
-        elif (mode == "CQF_All_1_Filter") or (mode == "Layer_All_1_Filter"):  # 块内只训练第一个低频滤波器和第一个高频滤波器，辐射到全局
-            self.wn1 = WN_SubBlock(horizontal=True, 
-                                filter_Init=filter_Init, 
-                                kernel_size=kernel_size, 
-                                trainable=[True,True], 
-                                in_channels=in_channels)
-            self.wn2 = WN_SubBlock(horizontal=False,
-                                filter_Init=filter_Init,
-                                kernel_size=kernel_size,
-                                trainable=[False,False],
-                                in_channels=in_channels)
-            
-            self.wn3 = WN_SubBlock(horizontal=False,
-                                filter_Init=filter_Init,
-                                kernel_size=kernel_size,
-                                trainable=[False,False],
-                                in_channels=in_channels)
-        
-        elif (mode == "CQF_Low_All") or (mode == "Layer_Low_All"):  # 块内训练每个子块的低通滤波器，辐射到全局
-            self.wn1 = WN_SubBlock(horizontal=True, 
-                                filter_Init=filter_Init, 
-                                kernel_size=kernel_size, 
-                                trainable=[True,False], 
-                                in_channels=in_channels)
-            self.wn2 = WN_SubBlock(horizontal=False,
-                                filter_Init=filter_Init,
-                                kernel_size=kernel_size,
-                                trainable=[True,False],
-                                in_channels=in_channels)
-            self.wn3 = WN_SubBlock(horizontal=False,
-                                filter_Init=filter_Init,
-                                kernel_size=kernel_size,
-                                trainable=[True,False],
-                                in_channels=in_channels)
+        else:
+            raise ValueError("mode must be 'Stable' or 'Free'")
 
-
-        
     def forward(self, input_data):
         low_coeff, high_coeff = self.wn1(input_data)
-        if (self.mode == "CQF_Low_1") or (self.mode == "Layer_Low_1") or (self.mode == "CQF_All_1_Filter") or (self.mode == "Layer_All_1_Filter"):
-            tmplow = torch.nn.Parameter(self.wn1.kernel_Low[0].weight.data.permute(0, 1, 3, 2), requires_grad=False)
-            tmphigh = torch.nn.Parameter(self.wn1.kernel_High[0].weight.data.permute(0, 1, 3, 2), requires_grad=False)
-            self.wn2.kernel_Low[0].weight = tmplow 
-            self.wn3.kernel_Low[0].weight = tmplow 
-            self.wn2.kernel_High[0].weight = tmphigh 
-            self.wn3.kernel_High[0].weight = tmphigh 
-        
         ll, lh = self.wn2(low_coeff)
         hl, hh = self.wn3(high_coeff)
-
         return (low_coeff, high_coeff, ll, lh, hl, hh) 
     
 
@@ -305,36 +242,27 @@ class FLDQWN(nn.Module):
             nn.Tanh(),
         )
         
-        
         self.wtn = nn.ModuleList()  # 主干网络
         in_channel = first_out_channel
         out_planes = first_out_channel
-        if (mode == "CQF_Low_1") or (mode == "CQF_All_1_Filter") or (mode == "CQF_Low_All") or (mode == "CQF_All_All"):
-            # 只有第一块训练，其他块不训练,相当于只有一块重复运算
+        for _ in range(num_level):
             self.wtn.append(
                 LevelWNBlocks(wavelet, in_channel, kernel_size,
-                              regu_details, regu_approx, bottleneck, mode=mode)
+                            regu_details, regu_approx, bottleneck, mode=mode)
             )
-            
-        else:
-            for _ in range(num_level):
-                self.wtn.append(
-                    LevelWNBlocks(wavelet, in_channel, kernel_size,
-                                regu_details, regu_approx, bottleneck, mode=mode)
-                )
         if self.moreconv:
             out_planes += in_channel*num_level
             self.dsp = self.dsp = downsample_conv_block(level=num_level, in_plane=first_out_channel)  # 下采样网络
         else:
             for i in range(num_level):
                 out_planes += in_channel*3
-        # self.fc = nn.Linear(out_planes, num_classes)
+
         self.fc = nn.Sequential(
             nn.Linear(out_planes, 128),       
             nn.Tanh(),
             nn.Dropout(0.1),
             nn.Linear(128, num_classes)#,
-            # nn.Softmax(dim=1)
+
         )
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
     
@@ -342,6 +270,7 @@ class FLDQWN(nn.Module):
         rs = []
         det = []
         x = self.conv1(x)
+        
         if len(self.wtn) == 1:
             for i in range(self.num_level):
                 for wtn in self.wtn:
@@ -357,66 +286,68 @@ class FLDQWN(nn.Module):
                 if self.moreconv:
                     details = self.dsp.blks[i](details)
                 det += [self.avgpool(details)]
-
         
         aprox = self.avgpool(x)
         det += [aprox]
         x = torch.cat(det,1) 
         x = x.view(-1, x.size()[1])
         return self.fc(x), rs
-            
-# def pad(signal, padsize, horizontal=True):
-#     signal_padded = signal.clone()
 
-#     if horizontal:
-#         dim = signal.dim()-1
-#         i = padsize // signal.shape[-1]  # recycle
-#         ipad = signal.shape[-1]  # recycle padsize
-#         jpad = padsize % signal.shape[-1]  # final_padsize
 
-#         # ...
-#         for _ in range(i):
-#             signal_padded = torch.cat([signal_padded[:,:,:, -ipad:],
-#                                        signal_padded, 
-#                                        signal_padded[:,:,:,:ipad]],  dim)
-#         if jpad==0 and signal.shape[-1] % 2 == 0:
-#             return signal_padded
-#         if signal.shape[-1] % 2 == 1:
+"""   
+def pad(signal, padsize, horizontal=True):
+    signal_padded = signal.clone()
 
-#             # ...
-#             signal_padded = torch.cat([signal_padded[:,:,:, -jpad-1:],
-#                                     signal_padded,
-#                                     signal_padded[:,:,:,:jpad]],  dim)
-#         else:
-#             # ...
-#             signal_padded = torch.cat([signal_padded[:,:,:, -jpad:],
-#                                     signal_padded,
-#                                     signal_padded[:,:,:,:jpad]],  dim)
-#         return signal_padded
-#     else:
-#         dim = signal.dim()-2
-#         i = padsize // signal.shape[-2]  # recycle
-#         ipad = signal.shape[-2]
-#         jpad = padsize % signal.shape[-2]
+    if horizontal:
+        dim = signal.dim()-1
+        i = padsize // signal.shape[-1]  # recycle
+        ipad = signal.shape[-1]  # recycle padsize
+        jpad = padsize % signal.shape[-1]  # final_padsize
 
-#         for _ in range(i):
-#             signal_padded = torch.cat([signal_padded[:,:,-ipad:, :],
-#                                        signal_padded, 
-#                                        signal_padded[:,:,:ipad, :]],  dim)
-#         if jpad==0 and signal.shape[-2] % 2 == 0:
-#             return signal_padded
-#         if signal.shape[-2] % 2 == 1:
+        # ...
+        for _ in range(i):
+            signal_padded = torch.cat([signal_padded[:,:,:, -ipad:],
+                                       signal_padded, 
+                                       signal_padded[:,:,:,:ipad]],  dim)
+        if jpad==0 and signal.shape[-1] % 2 == 0:
+            return signal_padded
+        if signal.shape[-1] % 2 == 1:
 
-#             signal_padded = torch.cat([signal_padded[:,:,-jpad-1:, :],
-#                                     signal_padded,
-#                                     signal_padded[:,:,:jpad, :]],  dim)
-#         else:
+            # ...
+            signal_padded = torch.cat([signal_padded[:,:,:, -jpad-1:],
+                                    signal_padded,
+                                    signal_padded[:,:,:,:jpad]],  dim)
+        else:
+            # ...
+            signal_padded = torch.cat([signal_padded[:,:,:, -jpad:],
+                                    signal_padded,
+                                    signal_padded[:,:,:,:jpad]],  dim)
+        return signal_padded
+    else:
+        dim = signal.dim()-2
+        i = padsize // signal.shape[-2]  # recycle
+        ipad = signal.shape[-2]
+        jpad = padsize % signal.shape[-2]
 
-#             signal_padded = torch.cat([torch.flip(signal_padded[:,:,-jpad:, :], [dim]),
-#                                     signal_padded,
-#                                     torch.flip(signal_padded[:,:,:jpad, :], [dim])],  dim)
-#         return signal_padded
-           
+        for _ in range(i):
+            signal_padded = torch.cat([signal_padded[:,:,-ipad:, :],
+                                       signal_padded, 
+                                       signal_padded[:,:,:ipad, :]],  dim)
+        if jpad==0 and signal.shape[-2] % 2 == 0:
+            return signal_padded
+        if signal.shape[-2] % 2 == 1:
+
+            signal_padded = torch.cat([signal_padded[:,:,-jpad-1:, :],
+                                    signal_padded,
+                                    signal_padded[:,:,:jpad, :]],  dim)
+        else:
+
+            signal_padded = torch.cat([torch.flip(signal_padded[:,:,-jpad:, :], [dim]),
+                                    signal_padded,
+                                    torch.flip(signal_padded[:,:,:jpad, :], [dim])],  dim)
+        return signal_padded
+"""       
+
 
 def pad(signal, padsize, horizontal=True):
     signal_padded = signal.clone()
