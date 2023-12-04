@@ -8,9 +8,15 @@ import os
 import model.fldqwn as fldqwn
 import model.dawn as dawn
 import model.wcnn as wcnn
+import model.tcnn as tcnn
+from model.contourlet_cnn import ContourletCNN
 import math
 from utils.astools import CSVStats, train, validate, save_checkpoint
 from utils.load_data import load_data
+
+use_cuda = torch.cuda.is_available()
+device = torch.device("cuda" if use_cuda else "cpu")
+
 parser = argparse.ArgumentParser(description='Training cammands')
 
 parser.add_argument('--data_name', type=str, default='bark-20', help='dataset name')
@@ -34,7 +40,7 @@ parser_despawn.add_argument('--kernel_size', default=8, type=int, help='wavelet 
 parser_despawn.add_argument('--regu_details', default=0.1, type=float, help='regu_details')
 parser_despawn.add_argument('--regu_approx', default=0.1, type=float, help='regu_approx')
 parser_despawn.add_argument('--bottleneck', default=True, type=bool, help='bottleneck')
-parser_despawn.add_argument('--moreconv', default=True, type=bool, help='moreconv')
+parser_despawn.add_argument('--moreconv', action= "store_false", help='moreconv')  # 提到才为false
 parser_despawn.add_argument('--wavelet', default='db4', type=str, help='wavelet')
 parser_despawn.add_argument('--mode', choices=['Stable', 'CQF_Low_1', 'CQF_All_1_Filter', 'CQF_Low_All', 'CQF_All_All',
                                                'Layer_Low_1', 'Layer_All_1_Filter', 'Layer_Low_All', 'Free'], default='Free')
@@ -47,6 +53,8 @@ parser_squeezenet = subparsers.add_parser('squeezenet')
 parser_mobilenet = subparsers.add_parser('mobilenet')
 parser_shufflenet = subparsers.add_parser('shufflenet')
 parser_efficientnet = subparsers.add_parser('efficientnet')
+parser_tcnn = subparsers.add_parser('tcnn')
+parser_tcnn.add_argument("--big_input", default=True, action='store_false')
 
 parser_dawn = subparsers.add_parser('dawn')
 parser_dawn.add_argument("--regu_details", default=0.1, type=float)
@@ -61,20 +69,15 @@ parser_dawn.add_argument("--simple_lifting", default=False, action='store_true')
 parser_dawn.add_argument("--haar_wavelet", default=False, action='store_true')
 parser_dawn.add_argument('--warmup', default=False, action='store_true')
 
-parser_scatter = subparsers.add_parser('scatter')
-parser_scatter.add_argument('--scat', default=2, type=int,help='scattering scale, j=0 means no scattering')
-parser_scatter.add_argument('--N', default=32, type=int,help='size of the crop')
-parser_scatter.add_argument('--classifier', type=str, default='WRN',help='classifier model [WRN, mlp, linear]')
-parser_scatter.add_argument('--mode', type=int, default=1,help='scattering 1st or 2nd order')
-parser_scatter.add_argument('--blocks', type=int, default=2,help='for WRN number of blocks of layers: n ')
-parser_scatter.add_argument('--use_avg_pool', default=False, action='store_true', help='use avg pooling before the classifier')
-
 parser_wcnn = subparsers.add_parser('wcnn')
 parser_wcnn.add_argument("--wavelet", choices=['haar', 'db2', 'lifting'])
 parser_wcnn.add_argument("--levels", default=4, type=int)
+parser_wcnn.add_argument("--big_input", default=True, action='store_false')
+
+parser_ccnn = subparsers.add_parser('ccnn')
+parser_ccnn.add_argument("--input_dim", nargs='+', type=int, default=[3, 224, 224])
 
 args = parser.parse_args()
-
 
 def adjust_learning_rate(optimizer, epoch, inv_drop):
     lr = args.lr
@@ -166,15 +169,16 @@ elif args.model == 'dawn':
                     )
 elif args.model == 'wcnn':
     model = wcnn.WCNN(
-        num_classes, big_input=True, wavelet=args.wavelet, levels=args.levels)
+        num_classes, big_input=args.big_input, wavelet=args.wavelet, levels=args.levels)
 
-elif args.model == 'scatter':
-    from kymatio import Scattering2D
-    from model.scatter.Scatter_WRN import ScatResNet
-    
-    scattering = Scattering2D(J=args.scat, shape=(args.N, args.N), max_order=args.mode)
-    scattering = scattering.cuda()
-    model = ScatResNet(args.scat, 256, num_classes, args.classifier, args.mode)
+elif args.model == 'tcnn':
+    model = tcnn.TCNN(
+        num_classes, big_input=args.big_input, use_original=False)
+
+elif args.model == 'ccnn':
+    model = ContourletCNN(input_dim=args.input_dim, 
+                          num_classes=num_classes, 
+                          variant="SSF", spec_type="all").to(device)  
 
 if args.resume:
     directory = "runs/%s/" % (name)

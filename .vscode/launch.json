@@ -12,10 +12,15 @@
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": [
-                "--name", "fldqwn64",
-                "--data_name", "flower102",
-                "--batch_size", "4", 
+                "--name", "fldqwcnnoconv",
+                "--data_name", "kth-a",
+                "--epochs", "90",
                 "fldqwn",
+                "--moreconv",
+                // "--big_input"
+                // "--wavelet", "haar",
+                // "--levels", "3",
+                
 
 
             ]

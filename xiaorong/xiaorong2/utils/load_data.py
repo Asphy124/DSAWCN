@@ -9,9 +9,9 @@ import shutil
 
 
 def sample_kth(mode='a'):
-    root = '../../data/KTH-TIPS2-b'
+    root = '..\\data\\KTH-TIPS2-b'
     class_path = os.listdir(root)
-    data_root = '../../data/kths2_' + mode
+    data_root = '..\\data\\kths2_' + mode
     train_root = os.path.join(data_root, 'train')
     test_root = os.path.join(data_root, 'test')
     if not os.path.exists(data_root):
@@ -68,9 +68,9 @@ def load_data(data_name=None, gcn=False, split_data=0.2, batch_size=16):
                 normalize
         ])
         
-        training_data = datasets.dtd.DTD(root='../../data/dtd/', split="train",
+        training_data = datasets.dtd.DTD(root='../data/dtd/', split="train",
                                          download=True, transform=transform_train)
-        validation_data = datasets.dtd.DTD(root='../../data/dtd/', split="val",
+        validation_data = datasets.dtd.DTD(root='../data/dtd/', split="val",
                                            download=True, transform=transform_test)
         
         train_loader = torch.utils.data.DataLoader(training_data, batch_size=batch_size, shuffle=True)
@@ -126,21 +126,21 @@ def load_data(data_name=None, gcn=False, split_data=0.2, batch_size=16):
                              ])
         if data_name == 'trunk12':
             train_set = datasets.ImageFolder(
-                root="../../data/Trunk12", transform=transform_train)
+                root="../data/Trunk12", transform=transform_train)
             val_set = datasets.ImageFolder(
-                root="../../data/Trunk12", transform=transform_test)
+                root="../data/Trunk12", transform=transform_test)
             num_classes = 12
         elif data_name == 'bark-39':
             train_set = datasets.ImageFolder(
-                root="../../data/barktexture39", transform=transform_train)
+                root="../data/barktexture39", transform=transform_train)
             val_set = datasets.ImageFolder(
-                root="../../data/barktexture39", transform=transform_test)
+                root="../data/barktexture39", transform=transform_test)
             num_classes = 39
         elif data_name == 'bark-20':
             train_set = datasets.ImageFolder(
-                root="../../data/barknet20/", transform=transform_train)
+                root="../data/barknet20/", transform=transform_train)
             val_set = datasets.ImageFolder(
-                root="../../data/barknet20/", transform=transform_test)
+                root="../data/barknet20/", transform=transform_test)
             num_classes = 20
         elif data_name == 'leaves':
             transform_train = transforms.Compose(
@@ -156,9 +156,9 @@ def load_data(data_name=None, gcn=False, split_data=0.2, batch_size=16):
                                 normalize
                                 ])
             train_set = datasets.ImageFolder(
-                root="../../data/LeavesTex1200", transform=transform_train)
+                root="../data/LeavesTex1200", transform=transform_train)
             val_set = datasets.ImageFolder(
-                root="../../data/LeavesTex1200", transform=transform_test)
+                root="../data/LeavesTex1200", transform=transform_test)
             num_classes = 20
         else:
             raise "Unknown dataset"

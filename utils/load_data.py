@@ -9,9 +9,9 @@ import shutil
 
 
 def sample_kth(mode='a'):
-    root = './data/KTH-TIPS2-b'
+    root = '.\\data\\KTH-TIPS2-b'
     class_path = os.listdir(root)
-    data_root = './data/kths2_' + mode
+    data_root = '.\\data\\kths2_' + mode
     train_root = os.path.join(data_root, 'train')
     test_root = os.path.join(data_root, 'test')
     if not os.path.exists(data_root):
