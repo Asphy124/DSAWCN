@@ -39,7 +39,7 @@ class downsample_conv_block(nn.Module):
             self.blks = nn.ModuleList([*blks])
 
 
-class WN_SubBlock(nn.Module):  # 一个Block，包含一个低通滤波器和一个高通滤波器
+class WN_SubBlock(nn.Module): 
     def __init__(self,
                  horizontal=True,
                  filter_Init=0,
@@ -60,10 +60,10 @@ class WN_SubBlock(nn.Module):  # 一个Block，包含一个低通滤波器和一
             s = (2, 1)
 
         low_pass_filter = torch.cat([filter_Init] * in_channels, dim=0)
-        high_pass_filter = get_cmf(low_pass_filter, kernel_size)  # 高通滤波器
+        high_pass_filter = get_cmf(low_pass_filter, kernel_size)
 
-        w1 = nn.Conv2d(self.in_channels, self.in_channels, self.kernel_size, stride=s, bias=False, groups=in_channels)  # channels需要修改
-        w1.weight = nn.Parameter(data=low_pass_filter.clone(), requires_grad=trainable[0])  # 初始化完成
+        w1 = nn.Conv2d(self.in_channels, self.in_channels, self.kernel_size, stride=s, bias=False, groups=in_channels)
+        w1.weight = nn.Parameter(data=low_pass_filter.clone(), requires_grad=trainable[0])
         self.kernel_Low = nn.Sequential(w1, nn.Tanh())
         # self.kernel_Low = nn.Sequential(w1, )
 
@@ -83,17 +83,18 @@ class WN_SubBlock(nn.Module):  # 一个Block，包含一个低通滤波器和一
 
 
 
-class WNBlock(nn.Module):  # 一个Block，包含三个WN_SubBlock
+class WNBlock(nn.Module):
     def __init__(self, wavelet="db4", kernel_size=8, in_channels=3, mode="Stable") -> None:
         super(WNBlock, self).__init__()
         self.mode = mode
+        self.kernel_size = kernel_size
 
         filter_Init = pywt.Wavelet(wavelet).filter_bank[2]
-        filter_Init = np.array(filter_Init)[np.newaxis, np.newaxis, :, np.newaxis].copy()  # 浅复制
+        filter_Init = np.array(filter_Init)[np.newaxis, np.newaxis, :, np.newaxis].copy()
         # 转为float32
         filter_Init = torch.from_numpy(filter_Init).float().to("cuda")
 
-        if (mode == "Free") or (mode == "CQF_All_All"):  # 块内全训练
+        if (mode == "Free") or (mode == "CQF_All_All"):
             self.wn1 = WN_SubBlock(horizontal=True, 
                     filter_Init=filter_Init, 
                     kernel_size=kernel_size, 
@@ -128,7 +129,7 @@ class WNBlock(nn.Module):  # 一个Block，包含三个WN_SubBlock
                                 trainable=[False,False],
                                 in_channels=in_channels)
         
-        elif (mode == "CQF_Low_1") or (mode == "Layer_Low_1"):  # 块内只训练第一个低频滤波器,CQF辐射到全局,Layer每层均可训练
+        elif (mode == "CQF_Low_1") or (mode == "Layer_Low_1"):
             self.wn1 = WN_SubBlock(horizontal=True, 
                                 filter_Init=filter_Init, 
                                 kernel_size=kernel_size, 
@@ -146,7 +147,7 @@ class WNBlock(nn.Module):  # 一个Block，包含三个WN_SubBlock
                                 trainable=[False,False],
                                 in_channels=in_channels)
         
-        elif (mode == "CQF_All_1_Filter") or (mode == "Layer_All_1_Filter"):  # 块内只训练第一个低频滤波器和第一个高频滤波器，辐射到全局
+        elif (mode == "CQF_All_1_Filter") or (mode == "Layer_All_1_Filter"):
             self.wn1 = WN_SubBlock(horizontal=True, 
                                 filter_Init=filter_Init, 
                                 kernel_size=kernel_size, 
@@ -164,7 +165,7 @@ class WNBlock(nn.Module):  # 一个Block，包含三个WN_SubBlock
                                 trainable=[False,False],
                                 in_channels=in_channels)
         
-        elif (mode == "CQF_Low_All") or (mode == "Layer_Low_All"):  # 块内训练每个子块的低通滤波器，辐射到全局
+        elif (mode == "CQF_Low_All") or (mode == "Layer_Low_All"):
             self.wn1 = WN_SubBlock(horizontal=True, 
                                 filter_Init=filter_Init, 
                                 kernel_size=kernel_size, 
@@ -196,7 +197,21 @@ class WNBlock(nn.Module):  # 一个Block，包含三个WN_SubBlock
         ll, lh = self.wn2(low_coeff)
         hl, hh = self.wn3(high_coeff)
 
-        return (low_coeff, high_coeff, ll, lh, hl, hh) 
+        kernel_low_coeff_loss_1 = (torch.norm(self.wn1.kernel_Low[0].weight, p=2)/self.kernel_size - 1.)**2 + \
+                                  (torch.norm(self.wn2.kernel_Low[0].weight, p=2)/self.kernel_size - 1.)**2 + \
+                                  (torch.norm(self.wn3.kernel_Low[0].weight, p=2)/self.kernel_size - 1.)**2
+        
+        kernel_low_coeff_loss_2 = (self.wn1.kernel_Low[0].weight.mean() - torch.sqrt(torch.tensor(2))/self.kernel_size)**2 + \
+                                  (self.wn2.kernel_Low[0].weight.mean() - torch.sqrt(torch.tensor(2))/self.kernel_size)**2 + \
+                                  (self.wn3.kernel_Low[0].weight.mean() - torch.sqrt(torch.tensor(2))/self.kernel_size)**2
+        
+        kernel_low_coeff_loss = kernel_low_coeff_loss_1 + kernel_low_coeff_loss_2
+
+        kernel_high_coeff_loss = (self.wn1.kernel_High[0].weight.mean())**2 + \
+                                  (self.wn2.kernel_High[0].weight.mean())**2 + \
+                                  (self.wn3.kernel_High[0].weight.mean())**2
+        
+        return (low_coeff, high_coeff, ll, lh, hl, hh, kernel_low_coeff_loss, kernel_high_coeff_loss) 
     
 
 
@@ -205,7 +220,6 @@ class BottleneckBlock(nn.Module):
         super(BottleneckBlock, self).__init__()
         self.bn1 = nn.BatchNorm2d(in_planes)
         self.relu = nn.ReLU(inplace=True)
-        # This disable the conv if compression rate is equal to 1
         self.disable_conv = in_planes == out_planes
         if not self.disable_conv:
             self.conv1 = nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=1,
@@ -242,19 +256,19 @@ class LevelWNBlocks(nn.Module):
             self.bottleneck = BottleneckBlock(in_channel, in_channel)
     
     def forward(self, x):
-        (c, d, ll, lh, hl, hh) = self.waveletst(x)  #低频和高频
+        (c, d, ll, lh, hl, hh, wloss1, wloss2) = self.waveletst(x)  #低频和高频
         details=torch.cat([lh, hl, hh],1)
         r = None
         if(self.regu_approx + self.regu_details != 0.0):
             if self.regu_details:
-                rd = self.regu_details * self.loss_details(d, torch.zeros(d.size()).cuda())
-                rd += self.regu_details * self.loss_details(lh, torch.zeros(lh.size()).cuda())
-                rd += self.regu_details * self.loss_details(hh, torch.zeros(hh.size()).cuda())
+                # rd = self.regu_details * self.loss_details(d, torch.zeros(d.size()).cuda())
+                # rd += self.regu_details * self.loss_details(lh, torch.zeros(lh.size()).cuda())
+                # rd += self.regu_details * self.loss_details(hh, torch.zeros(hh.size()).cuda())
+                rd = self.regu_details * wloss1
             if self.regu_approx:
-                rc = self.regu_approx * torch.dist(c.mean(), ll.mean(), p=2)
-                rc += self.regu_approx * torch.dist(ll.mean(), c.mean(), p=2)
-                rc += self.regu_approx * torch.dist(hl.mean(), d.mean(), p=2)
-
+                # rc = self.regu_approx * torch.dist(c.mean(), ll.mean(), p=2)
+                # rc += self.regu_approx * torch.dist(hl.mean(), d.mean(), p=2)
+                rc = self.regu_approx * wloss2
             if self.regu_approx == 0.0:
                 r = rd
             elif self.regu_details == 0.0:
@@ -295,7 +309,6 @@ class FLDQWN(nn.Module):
         self.bottleneck = bottleneck
         self.moreconv = moreconv
 
-        # 第一层：
         self.conv1 = nn.Sequential(
             nn.Conv2d(first_in_channel, first_out_channel, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(first_out_channel),
@@ -305,12 +318,10 @@ class FLDQWN(nn.Module):
             nn.Tanh(),
         )
         
-        
-        self.wtn = nn.ModuleList()  # 主干网络
+        self.wtn = nn.ModuleList()
         in_channel = first_out_channel
         out_planes = first_out_channel
         if (mode == "CQF_Low_1") or (mode == "CQF_All_1_Filter") or (mode == "CQF_Low_All") or (mode == "CQF_All_All"):
-            # 只有第一块训练，其他块不训练,相当于只有一块重复运算
             self.wtn.append(
                 LevelWNBlocks(wavelet, in_channel, kernel_size,
                               regu_details, regu_approx, bottleneck, mode=mode)
@@ -324,7 +335,7 @@ class FLDQWN(nn.Module):
                 )
         if self.moreconv:
             out_planes += in_channel*num_level
-            self.dsp = self.dsp = downsample_conv_block(level=num_level, in_plane=first_out_channel)  # 下采样网络
+            self.dsp = self.dsp = downsample_conv_block(level=num_level, in_plane=first_out_channel)
         else:
             for i in range(num_level):
                 out_planes += in_channel*3
@@ -357,7 +368,6 @@ class FLDQWN(nn.Module):
                 if self.moreconv:
                     details = self.dsp.blks[i](details)
                 det += [self.avgpool(details)]
-
         
         aprox = self.avgpool(x)
         det += [aprox]
@@ -365,59 +375,6 @@ class FLDQWN(nn.Module):
         x = x.view(-1, x.size()[1])
         return self.fc(x), rs
             
-# def pad(signal, padsize, horizontal=True):
-#     signal_padded = signal.clone()
-
-#     if horizontal:
-#         dim = signal.dim()-1
-#         i = padsize // signal.shape[-1]  # recycle
-#         ipad = signal.shape[-1]  # recycle padsize
-#         jpad = padsize % signal.shape[-1]  # final_padsize
-
-#         # ...
-#         for _ in range(i):
-#             signal_padded = torch.cat([signal_padded[:,:,:, -ipad:],
-#                                        signal_padded, 
-#                                        signal_padded[:,:,:,:ipad]],  dim)
-#         if jpad==0 and signal.shape[-1] % 2 == 0:
-#             return signal_padded
-#         if signal.shape[-1] % 2 == 1:
-
-#             # ...
-#             signal_padded = torch.cat([signal_padded[:,:,:, -jpad-1:],
-#                                     signal_padded,
-#                                     signal_padded[:,:,:,:jpad]],  dim)
-#         else:
-#             # ...
-#             signal_padded = torch.cat([signal_padded[:,:,:, -jpad:],
-#                                     signal_padded,
-#                                     signal_padded[:,:,:,:jpad]],  dim)
-#         return signal_padded
-#     else:
-#         dim = signal.dim()-2
-#         i = padsize // signal.shape[-2]  # recycle
-#         ipad = signal.shape[-2]
-#         jpad = padsize % signal.shape[-2]
-
-#         for _ in range(i):
-#             signal_padded = torch.cat([signal_padded[:,:,-ipad:, :],
-#                                        signal_padded, 
-#                                        signal_padded[:,:,:ipad, :]],  dim)
-#         if jpad==0 and signal.shape[-2] % 2 == 0:
-#             return signal_padded
-#         if signal.shape[-2] % 2 == 1:
-
-#             signal_padded = torch.cat([signal_padded[:,:,-jpad-1:, :],
-#                                     signal_padded,
-#                                     signal_padded[:,:,:jpad, :]],  dim)
-#         else:
-
-#             signal_padded = torch.cat([torch.flip(signal_padded[:,:,-jpad:, :], [dim]),
-#                                     signal_padded,
-#                                     torch.flip(signal_padded[:,:,:jpad, :], [dim])],  dim)
-#         return signal_padded
-           
-
 def pad(signal, padsize, horizontal=True):
     signal_padded = signal.clone()
 

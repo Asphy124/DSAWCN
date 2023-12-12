@@ -12,11 +12,13 @@
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": [
-                "--name", "fldqwcnnoconv",
-                "--data_name", "kth-a",
+                "--name", "fldqwcn",
+                "--data_name", "leaves",
                 "--epochs", "90",
-                "fldqwn",
-                "--moreconv",
+                "--batch_size", "1",
+                "fldqwn"
+                // "ccnn",
+                // "--input_dim", "3", "224", "224"
                 // "--big_input"
                 // "--wavelet", "haar",
                 // "--levels", "3",

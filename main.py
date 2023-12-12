@@ -15,11 +15,11 @@ from utils.astools import CSVStats, train, validate, save_checkpoint
 from utils.load_data import load_data
 
 use_cuda = torch.cuda.is_available()
-device = torch.device("cuda" if use_cuda else "cpu")
+device = torch.device("cuda:0" if use_cuda else "cpu")
 
 parser = argparse.ArgumentParser(description='Training cammands')
 
-parser.add_argument('--data_name', type=str, default='bark-20', help='dataset name')
+parser.add_argument('--data_name', type=str, default='leaves', help='dataset name')
 parser.add_argument('--gcn', type=bool, default=False, help='gcn')
 parser.add_argument('--split_data', type=float, default=0.20, help='split data')
 parser.add_argument('--batch_size', type=int, default=16, help='batch size')
@@ -27,8 +27,7 @@ parser.add_argument('--lr', type=float, default=0.03, help='learning rate')
 parser.add_argument('--epochs', type=int, default=300, help='learning epochs')
 parser.add_argument('--name', default='fldqwn', type=str)
 parser.add_argument('--resume', default=False, type=bool)
-parser.add_argument("--lrdecay", nargs='+', type=int, default=[30,60,90,120])  #除39外使用此衰减值
-# parser.add_argument("--lrdecay", nargs='+', type=int, default=[60, 120, 160, 200])  #除39外使用此衰减值
+parser.add_argument("--lrdecay", nargs='+', type=int, default=[30,60,90,120])
 parser.add_argument('--drop', default=3, type=int, help='drop learning rate')
 
 
@@ -40,7 +39,7 @@ parser_despawn.add_argument('--kernel_size', default=8, type=int, help='wavelet 
 parser_despawn.add_argument('--regu_details', default=0.1, type=float, help='regu_details')
 parser_despawn.add_argument('--regu_approx', default=0.1, type=float, help='regu_approx')
 parser_despawn.add_argument('--bottleneck', default=True, type=bool, help='bottleneck')
-parser_despawn.add_argument('--moreconv', action= "store_false", help='moreconv')  # 提到才为false
+parser_despawn.add_argument('--moreconv', action= "store_false", help='moreconv')
 parser_despawn.add_argument('--wavelet', default='db4', type=str, help='wavelet')
 parser_despawn.add_argument('--mode', choices=['Stable', 'CQF_Low_1', 'CQF_All_1_Filter', 'CQF_Low_All', 'CQF_All_All',
                                                'Layer_Low_1', 'Layer_All_1_Filter', 'Layer_Low_All', 'Free'], default='Free')
@@ -89,29 +88,24 @@ def adjust_learning_rate(optimizer, epoch, inv_drop):
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
-
-# 载入数据集
 train_loader, val_loader, num_classes = load_data(args.data_name, 
                                                   args.gcn,
                                                   args.split_data,
                                                   args.batch_size)
 
 name = args.data_name + '_' + args.name
-# 载入模型
 """
-DeSpawn2D可训练参数量 = kernel_size * in_channel * f(mode, num_level)
-mode:
-    "Stable": 固定  可训练参数量6 * 3 * 0 = 0
-
-    "CQF_Low_1": 一块的一子块  的低通滤波器训练，高通滤波器通过公式求得，子块和块共享  [可训练参数量]kernel_size * in_channel * 1
-    "CQF_All_1_Filter": 一块的第一子块  的低高通滤波器训练，子块和块共享  [可训练参数量]kernel_size * in_channel * 2
-    "CQF_Low_All": 一块的所有子块  的低通滤波器训练，高通滤波器通过公式求得，块共享  [可训练参数量]kernel_size * in_channel * 3
-    "CQF_All_All": 一块的所有子块的高低通滤波器训练，块共享  [可训练参数量]kernel_size * in_channel * 6
-
-    "Layer_Low_1": 每块的一子块  的低通滤波器训练，高通滤波器通过公式求得，子块共享  [可训练参数量]kernel_size * in_channel * num_level * 1
-    "Layer_All_1_Filter": 每块的第一子块  的低高通滤波器训练，子块共享  [可训练参数量]kernel_size * in_channel * num_level * 2
-    "Layer_Low_All": 每块的所有子块的  低通滤波器训练，高通滤波器通过公式求得  [可训练参数量]kernel_size * in_channel * num_level * 3
-    "Free": 所有滤波器自由训练  [可训练参数量]kernel_size * in_channel * num_level * 6
+The trainable parameters of DeSpawn2D are determined by the formula: trainable parameters = kernel_size * in_channel * f(mode, num_level)
+Here, the function f(mode, num_level) is defined based on different modes:
+- "Stable": Fixed, no trainable parameters (trainable parameters = 0).
+- "CQF_Low_1": Training low-pass filters for each sub-block within a block. High-pass filters are calculated through a formula. Sub-blocks and blocks share parameters. Trainable parameters = kernel_size * in_channel * 1.
+- "CQF_All_1_Filter": Training both low-pass and high-pass filters for the first sub-block within a block. Sub-blocks and blocks share parameters. Trainable parameters = kernel_size * in_channel * 2.
+- "CQF_Low_All": Training low-pass filters for all sub-blocks within a block. High-pass filters are calculated through a formula. Blocks share parameters. Trainable parameters = kernel_size * in_channel * 3.
+- "CQF_All_All": Training both high-pass and low-pass filters for all sub-blocks within a block. Blocks share parameters. Trainable parameters = kernel_size * in_channel * 6.
+- "Layer_Low_1": Training low-pass filters for each sub-block within each block. High-pass filters are calculated through a formula. Sub-blocks share parameters. Trainable parameters = kernel_size * in_channel * num_level * 1.
+- "Layer_All_1_Filter": Training both low-pass and high-pass filters for the first sub-block within each block. Sub-blocks share parameters. Trainable parameters = kernel_size * in_channel * num_level * 2.
+- "Layer_Low_All": Training low-pass filters for all sub-blocks within each block. High-pass filters are calculated through a formula. Sub-blocks share parameters. Trainable parameters = kernel_size * in_channel * num_level * 3.
+- "Free": Free training for all filters. Trainable parameters = kernel_size * in_channel * num_level * 6.
 """
 if args.model == 'fldqwn':
     model = fldqwn.FLDQWN(num_classes=num_classes, 
@@ -215,7 +209,7 @@ best_prec1 = 0
 #                                            threshold_mode='rel', 
 #                                            cooldown=0, min_lr=0, eps=1e-08)
 for epoch in range(args.epochs):
-    t0 = time.time()  # 计时
+    t0 = time.time()
     adjust_learning_rate(optimizer, epoch, args.drop)
     prec1_train, loss_train = train(
         train_loader, model, lossfunc, optimizer, model_name=args.model)

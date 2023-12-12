@@ -174,6 +174,8 @@ class ContourletCNN(nn.Module):
         # Fully connected layers
         self.fc_1 = nn.Linear(in_fc1, out_fc1)
         self.fc_2 = nn.Linear(in_fc2, num_classes)
+        # softmax layer
+        self.softmax = nn.Softmax(dim=1)
         
     def __pdfbdec(self, x, method="resize"):
         """Pyramidal directional filter bank decomposition for a batch of
@@ -281,6 +283,8 @@ class ContourletCNN(nn.Module):
         if self.variant == "SSF":
             x = torch.cat((x, sfs.to(self.device)), 1)
         x = self.fc_2(x) 
+        # Softmax layer
+        x = self.softmax(x)
         
         return x
     
