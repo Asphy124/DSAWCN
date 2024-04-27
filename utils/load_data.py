@@ -105,7 +105,7 @@ def load_data(data_name=None, gcn=False, split_data=0.2, batch_size=16):
             normalize = GCN()
         else:
             normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5],
-                                        std=[0.5, 0.5, 0.5]) # 要计算
+                                        std=[0.5, 0.5, 0.5]) 
         transform_train = transforms.Compose([
                              transforms.Resize(300),
                              transforms.RandomCrop(256),

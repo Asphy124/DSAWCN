@@ -19,7 +19,7 @@ parser.add_argument('--lr', type=float, default=0.03, help='learning rate')
 parser.add_argument('--epochs', type=int, default=300, help='learning epochs')
 parser.add_argument('--name', default='fldqwn', type=str)
 parser.add_argument('--resume', default=False, type=bool)
-parser.add_argument("--lrdecay", nargs='+', type=int, default=[30,60,90,120])  #除39外使用此衰减值
+parser.add_argument("--lrdecay", nargs='+', type=int, default=[30,60,90,120])
 parser.add_argument('--drop', default=3, type=int, help='drop learning rate')
 
 
@@ -50,14 +50,14 @@ def adjust_learning_rate(optimizer, epoch, inv_drop):
         param_group['lr'] = lr
 
 
-# 载入数据集
+
 train_loader, val_loader, num_classes = load_data(args.data_name, 
                                                   args.gcn,
                                                   args.split_data,
                                                   args.batch_size)
 
 name = args.data_name + '_' + args.name
-# 载入模型
+
 
 if args.model == 'fldqwn':
     model = fldqwn.FLDQWN(num_classes=num_classes, 
@@ -102,7 +102,7 @@ print("Number of *trainable* model parameters: {:,}".format(
 best_prec1 = 0
 
 for epoch in range(args.epochs):
-    t0 = time.time()  # 计时
+    t0 = time.time() 
     adjust_learning_rate(optimizer, epoch, args.drop)
     prec1_train, loss_train = train(
         train_loader, model, lossfunc, optimizer, model_name=args.model)

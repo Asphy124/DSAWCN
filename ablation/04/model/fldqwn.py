@@ -39,7 +39,7 @@ class downsample_conv_block(nn.Module):
             self.blks = nn.ModuleList([*blks])
 
 
-class WN_SubBlock(nn.Module):  # 一个Block，包含一个低通滤波器和一个高通滤波器
+class WN_SubBlock(nn.Module): 
     def __init__(self,
                  horizontal=True,
                  filter_Init=0,
@@ -60,10 +60,10 @@ class WN_SubBlock(nn.Module):  # 一个Block，包含一个低通滤波器和一
             s = (2, 1)
 
         low_pass_filter = torch.cat([filter_Init] * in_channels, dim=0)
-        high_pass_filter = get_cmf(low_pass_filter, kernel_size)  # 高通滤波器
+        high_pass_filter = get_cmf(low_pass_filter, kernel_size) 
 
-        w1 = nn.Conv2d(self.in_channels, self.in_channels, self.kernel_size, stride=s, bias=False, groups=in_channels)  # channels需要修改
-        w1.weight = nn.Parameter(data=low_pass_filter.clone(), requires_grad=trainable[0])  # 初始化完成
+        w1 = nn.Conv2d(self.in_channels, self.in_channels, self.kernel_size, stride=s, bias=False, groups=in_channels) 
+        w1.weight = nn.Parameter(data=low_pass_filter.clone(), requires_grad=trainable[0])  
         self.kernel_Low = nn.Sequential(w1, nn.Tanh())
         # self.kernel_Low = nn.Sequential(w1, )
 
@@ -81,17 +81,17 @@ class WN_SubBlock(nn.Module):  # 一个Block，包含一个低通滤波器和一
         return low_coeff, high_coeff
 
 
-class WNBlock(nn.Module):  # 一个Block，包含三个WN_SubBlock
+class WNBlock(nn.Module):  
     def __init__(self, wavelet="db4", kernel_size=8, in_channels=3, mode="Stable") -> None:
         super(WNBlock, self).__init__()
         self.mode = mode
 
         filter_Init = pywt.Wavelet(wavelet).filter_bank[2]
-        filter_Init = np.array(filter_Init)[np.newaxis, np.newaxis, :, np.newaxis].copy()  # 浅复制
-        # 转为float32
+        filter_Init = np.array(filter_Init)[np.newaxis, np.newaxis, :, np.newaxis].copy()  
+     
         filter_Init = torch.from_numpy(filter_Init).float().to("cuda")
 
-        if (mode == "Free"):  # 块内全训练
+        if (mode == "Free"): 
             self.wn1 = WN_SubBlock(horizontal=True, 
                     filter_Init=filter_Init, 
                     kernel_size=kernel_size, 
@@ -108,7 +108,7 @@ class WNBlock(nn.Module):  # 一个Block，包含三个WN_SubBlock
                     trainable=[True,True], 
                     in_channels=in_channels)
 
-        elif mode == "Stable":  # 块内全不训练
+        elif mode == "Stable": 
             self.wn1 = WN_SubBlock(horizontal=True, 
                                 filter_Init=filter_Init, 
                                 kernel_size=kernel_size, 
@@ -178,7 +178,7 @@ class LevelWNBlocks(nn.Module):
             self.bottleneck = BottleneckBlock(in_channel, in_channel)
     
     def forward(self, x):
-        (c, d, ll, lh, hl, hh) = self.waveletst(x)  #低频和高频
+        (c, d, ll, lh, hl, hh) = self.waveletst(x) 
         details=torch.cat([lh, hl, hh],1)
         r = None
         if(self.regu_approx + self.regu_details != 0.0):
@@ -233,7 +233,7 @@ class FLDQWN(nn.Module):
         self.bottleneck = bottleneck
         self.moreconv = moreconv
 
-        # 第一层：
+     
         self.conv1 = nn.Sequential(
             nn.Conv2d(first_in_channel, first_out_channel, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(first_out_channel),
@@ -243,7 +243,7 @@ class FLDQWN(nn.Module):
             nn.Tanh(),
         )
         
-        self.wtn = nn.ModuleList()  # 主干网络
+        self.wtn = nn.ModuleList() 
         in_channel = first_out_channel
         out_planes = first_out_channel
         for _ in range(num_level):
@@ -253,7 +253,7 @@ class FLDQWN(nn.Module):
             )
         if self.moreconv:
             out_planes += in_channel*num_level
-            self.dsp = self.dsp = downsample_conv_block(level=num_level, in_plane=first_out_channel)  # 下采样网络
+            self.dsp = self.dsp = downsample_conv_block(level=num_level, in_plane=first_out_channel) 
         else:
             for i in range(num_level):
                 out_planes += in_channel*3

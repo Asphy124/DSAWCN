@@ -91,7 +91,6 @@ class WNBlock(nn.Module):
 
         filter_Init = pywt.Wavelet(wavelet).filter_bank[2]
         filter_Init = np.array(filter_Init)[np.newaxis, np.newaxis, :, np.newaxis].copy()
-        # 转为float32
         filter_Init = torch.from_numpy(filter_Init).float().to("cuda")
 
         if (mode == "Free") or (mode == "CQF_All_All"):
@@ -111,7 +110,7 @@ class WNBlock(nn.Module):
                     trainable=[True,True], 
                     in_channels=in_channels)
 
-        if mode == "Stable":  # 块内全不训练
+        if mode == "Stable": 
             self.wn1 = WN_SubBlock(horizontal=True, 
                                 filter_Init=filter_Init, 
                                 kernel_size=kernel_size, 
@@ -256,7 +255,7 @@ class LevelWNBlocks(nn.Module):
             self.bottleneck = BottleneckBlock(in_channel, in_channel)
     
     def forward(self, x):
-        (c, d, ll, lh, hl, hh, wloss1, wloss2) = self.waveletst(x)  #低频和高频
+        (c, d, ll, lh, hl, hh, wloss1, wloss2) = self.waveletst(x) 
         details=torch.cat([lh, hl, hh],1)
         r = None
         if(self.regu_approx + self.regu_details != 0.0):

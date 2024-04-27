@@ -32,14 +32,14 @@ def sample_kth(mode='a'):
         for sub_name in os.listdir(os.path.join(root, class_path_e)):
             if sub_name == 'sample_' + mode:
                 sub_train_path = os.path.join(root, class_path_e, sub_name)
-                # 复制sub_train_path下的所有文件到class_train_path下
+
                 for file_name in os.listdir(sub_train_path):
                     file_path = os.path.join(sub_train_path, file_name)
                     shutil.copyfile(file_path, os.path.join(class_train_path, file_name))
 
             else:
                 sub_test_path = os.path.join(root, class_path_e, sub_name)
-                # 移动sub_test_path下的所有文件到class_test_path下
+ 
                 for file_name in os.listdir(sub_test_path):
                     file_path = os.path.join(sub_test_path, file_name)
                     shutil.copyfile(file_path, os.path.join(class_test_path, file_name))
@@ -109,7 +109,7 @@ def load_data(data_name=None, gcn=False, split_data=0.2, batch_size=16):
             normalize = GCN()
         else:
             normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5],
-                                        std=[0.5, 0.5, 0.5]) # 要计算
+                                        std=[0.5, 0.5, 0.5]) 
         transform_train = transforms.Compose([
                              transforms.Resize(300),
                              transforms.RandomCrop(256),
@@ -190,8 +190,8 @@ class GCN(object):
         self.epsilon = epsilon
 
     def __call__(self, img):
-        if self.channel_wise:  # 如果是RGB图像
-            assert(img.shape[0] == 3)  # assert断言，如果表达式为false(不是RGB图)，则触发异常
+        if self.channel_wise:  
+            assert(img.shape[0] == 3)  
             for i in range(3):
                 img[i, :, :] = img[i, :, :] - torch.mean(img[i, :, :])
                 norm = max(self.epsilon, torch.sqrt(self.sqrt_bias + torch.var(img[i, :, :])))
